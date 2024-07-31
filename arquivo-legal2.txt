@@ -1,0 +1,4 @@
+1|ARMAZEM DO ZEZINHO|123456|zezinho@gmail.com
+2|Julio Murta|99999999|1994-04-11|souzamurtaj@gmail.com|1
+3|2024-07-31|09:00|14:00|very good soccer player control the match
+4|invalid line
