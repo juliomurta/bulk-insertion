@@ -3,14 +3,10 @@
 use strict;
 use warnings;
 use File::Basename;
-use LWP::UserAgent;
-use HTTP::Request;
-use HTTP::Response;
+use DBI;
 use JSON;
 
-our $Domain   = "http://localhost:64569/api";
-our $UserName = "admin";
-our $Password = "Admin\@2020";
+our $ConnectionString = "dbi:ODBC:Driver={SQL Server};Server=localhost\\SQLEXPRESS;Database=OrderService;Trusted_Connection=True;TrustServerCertificate=True";
 
 sub start {
     print "*************************************************************************************************\n";
@@ -21,85 +17,45 @@ sub start {
     print "*************************************************************************************************\n";
 }
 
-sub api_login {
-    my $url = $Domain . "/account/login";
-    my $encoded = to_json({
-        name     => $UserName,
-        password => $Password
-    });
-
-    my $user_agent = LWP::UserAgent->new();
-    my $request = HTTP::Request->new('POST', $url);
-    $request->header('Content-Type'   => 'application/json');
-    $request->content($encoded);
-
-    my $response = $user_agent->request($request);
-    if ($response->is_success) {
-        print "\nSuccessfully Authenticated." . $response->decoded_content;            
-    } else {
-        print STDERR $response->status_line, "\n";
-    }
-
-    return $response->is_success;
-}
-
-sub api_logout {
-    my $url = $Domain . "/account/logout";
-
-    my $user_agent = LWP::UserAgent->new();
-    my $request = HTTP::Request->new('POST', $url);    
-    $request->header('Content-Length'   => '0');
-
-    my $response = $user_agent->request($request);
-
-    if ($response->is_success) {
-        print "\nLogout Successful." . $response->decoded_content;
-    } else {
-        print STDERR $response->status_line, "\n";
-    }
-
-    return $response->is_success;
-}
-
-sub send_customer_request {
-    my $url = $Domain . "/customers";
-    my $encoded = to_json({       
-	    name => "rock lee",
-	    documentNumber => "123123123",
-        email => "teste\@teste.com"
-    });
-
-    my $user_agent = LWP::UserAgent->new();
-    my $request = HTTP::Request->new('POST', $url);    
-    $request->header('Content-Type'   => 'application/json');
-    $request->content($encoded);
-
-    my $response = $user_agent->request($request);
-    if ($response->is_success) {
-        print "\nCustomer Saved Successfully." . $response->decoded_content;
-    } else {        
-        print STDERR $response->status_line, "\n";
-    }
-}
-
-sub send_employee_request {
-
-}
-
-sub send_order_request {
-
-}
-
 sub save_line {
-    my @infos = split('|', shift);    
+    my $dbh = shift;
+    my $line = shift;
+    my @infos = split(/\|/, $line);    
     my $line_type = $infos[0];
+    my $id = $infos[1];
 
     if ($line_type == 1) {
-        print "\nIt's a customer";
+        my $name = $infos[2];
+        my $document = $infos[3];
+        my $email = $infos[4];
+
+        my $sql = "INSERT INTO dbo.Customers (Id, Name, DocumentNumber, Email) VALUES (?, ?, ?, ?)";
+        my $sth = $dbh->prepare($sql);
+        $sth->execute($id, $name, $document, $email) or die $DBI::errstr;
+        $sth->finish;
     } elsif ($line_type == 2) {
-        print "\nIt's a customer";
+        my $name = $infos[2];
+        my $document = $infos[3];
+        my $birth_date = $infos[4];
+        my $email = $infos[5];
+        chomp(my $gender = $infos[6]);
+
+        my $sql = "INSERT INTO dbo.Employees (Id, Name, DocumentNumber, BirthDate, Email, Gender) VALUES (?, ?, ?, ?, ?, ?)";
+        my $sth = $dbh->prepare($sql);
+        $sth->execute($id, $name, $document, $birth_date, $email, $gender) or die $DBI::errstr;
+        $sth->finish
     } elsif ($line_type == 3) {
-        print "\nIt's an order";
+        my $date = $infos[2];
+        my $start = $infos[3];
+        my $finish = $infos[4];
+        my $description = $infos[5];
+        my $employee_id = $infos[6];
+        my $customer_id = $infos[7];
+
+        my $sql = "INSERT INTO dbo.Orders(Id, Date, Start, Finish, Description, EmployeeId, CustomerId) VALUES (?,?,?,?,?,?,?)";
+        my $sth = $dbh->prepare($sql);
+        $sth->execute($id, $date, $start, $finish, $description, $employee_id, $customer_id) or die $DBI::errstr;
+        $sth->finish;
     } else {
         print "\n$line_type isn't a valid type";
     }
@@ -111,13 +67,15 @@ sub process_positional_file {
     my $filename = shift;
     my $full_path = $path . $filename . ".txt";
     
+    my $dbh = DBI->connect($ConnectionString) or die "Can't connect to database: $DBI::errstr";
     open(FH, '<', $full_path) or die $!;
 
     while(<FH>){
-        save_line($_);
+        save_line($dbh, $_);
     }
 
     close(FH);
+    $dbh->disconnect;
 }
 
 sub process_csv_file {
@@ -138,15 +96,6 @@ sub process_records {
 }
 
 
-#start;
-#process_records(@ARGV[0]);
-
-#api_login;
- 
-    
-if(api_login){
-   send_customer_request;
-   # api_logout;
-}
-
+start;
+process_records(@ARGV[0]);
 
