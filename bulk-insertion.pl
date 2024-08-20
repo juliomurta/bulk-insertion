@@ -76,6 +76,7 @@ sub process_positional_file {
 
     close(FH);
     $dbh->disconnect;
+    print "\nFile processed succesfully!";
 }
 
 sub process_csv_file {
